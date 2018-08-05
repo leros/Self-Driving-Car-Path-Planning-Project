@@ -202,8 +202,11 @@ int main() {
   }
 
 
+  int lane = 1;
+  double ref_val = 49.5; //mph
 
-  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+
+  h.onMessage([&lane,&ref_val,&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -211,8 +214,7 @@ int main() {
     //auto sdata = string(data).substr(0, length);
     //cout << sdata << endl;
 
-    int lane = 1;
-    double ref_val = 49.5; //mph
+
 
     if (length && length > 2 && data[0] == '4' && data[1] == '2') {
 
@@ -267,10 +269,20 @@ int main() {
 
 					if((check_car_s > car_s) && ((check_car_s-car_s) < 30))
 					{
-						ref_val = 29.5; //mph
+						//ref_val = 29.5; //mph
+						too_close = true;
 					}
 				}
 
+			}
+
+			if(too_close)
+			{
+				ref_val -= .224;
+			}
+			else if(ref_val < 49.5)
+			{
+				ref_val += .224;
 			}
 
 
