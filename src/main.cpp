@@ -258,6 +258,7 @@ int main() {
 			for(int i = 0; i < sensor_fusion.size(); i++)
 			{
 				float d = sensor_fusion[i][6];
+				cout << d << " " << lane << " " << too_close << endl;
 				if(d < (2+4*lane+2) && d > (2+4*lane-2))
 				{
 					double vx = sensor_fusion[i][3];
@@ -278,7 +279,15 @@ int main() {
 
 			if(too_close)
 			{
-				ref_val -= .224;
+				//ref_val -= .224;
+				if(lane > 0)
+				{
+					lane -= 1; // move left if the front car is too close
+				}
+				else
+				{
+					lane += 1;
+				}
 			}
 			else if(ref_val < 49.5)
 			{
@@ -379,22 +388,6 @@ int main() {
 				next_y_vals.push_back(y_point);
 			}
 
-
-
-			/*
-          	vector<double> next_x_vals;
-          	vector<double> next_y_vals;
-
-			double dist_inc = 0.5;
-			for(int i = 0; i < 50; i++)
-			{
-				double next_s = car_s+(i+1)*dist_inc;
-				double next_d = 6;
-				vector<double> xy = getXY(next_s, next_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
-				next_x_vals.push_back(xy[0]);
-				next_y_vals.push_back(xy[1]);
-			}
-			 */
 			json msgJson;
 
           	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
