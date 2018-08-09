@@ -261,7 +261,6 @@ int main() {
 			{
 
 				float d = sensor_fusion[i][6];
-				//cout << d << " " << lane << " " << too_close_same_lane << endl;
 
 				double vx = sensor_fusion[i][3];
 				double vy = sensor_fusion[i][4];
@@ -270,20 +269,18 @@ int main() {
 
 				check_car_s += ((double)prev_size*.02*check_speed);
 
-				// check the car on the same lane
-
-				if((check_car_s > car_s) && ((check_car_s-car_s) < 30)){
+				// check cars on the same lane
+				if((check_car_s > car_s) && ((check_car_s-car_s) < 20)){
 					if(d < (2+4*lane+2) && d > (2+4*lane-2))
 					{
-						//ref_val = 29.5; //mph
 						too_close_same_lane = true;
 					}
-					// check the cars on the left lane
+					// check cars on the left lane
 					if ((lane > 0) && (d < (2+4*(lane-1)+2) && d > (2+4*(lane-1)-2)))
 					{
 						too_close_left_lane = true;
 					}
-					// check the cars on the right lane
+					// check cars on the right lane
 					if ((lane < 2) && (d < (2+4*(lane+1)+2) && d > (2+4*(lane+1)-2)))
 					{
 						too_close_right_lane = true;
@@ -303,7 +300,7 @@ int main() {
 					lane += 1;
 				}
 				else {
-					ref_val -= .224;
+					ref_val -= .01;
 				}
 			}
 			else if(ref_val < 49.5)
