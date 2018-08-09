@@ -253,40 +253,57 @@ int main() {
 			{
 				car_s = end_path_s;
 			}
-			bool too_close = false;
+			bool too_close_same_lane = false;
+			bool too_close_left_lane = false;
+			bool too_close_right_lane = false;
 
 			for(int i = 0; i < sensor_fusion.size(); i++)
 			{
+
 				float d = sensor_fusion[i][6];
-				cout << d << " " << lane << " " << too_close << endl;
-				if(d < (2+4*lane+2) && d > (2+4*lane-2))
-				{
-					double vx = sensor_fusion[i][3];
-					double vy = sensor_fusion[i][4];
-					double check_speed = sqrt(vx*vx + vy*vy);
-					double check_car_s = sensor_fusion[i][5];
+				//cout << d << " " << lane << " " << too_close_same_lane << endl;
 
-					check_car_s += ((double)prev_size*.02*check_speed);
+				double vx = sensor_fusion[i][3];
+				double vy = sensor_fusion[i][4];
+				double check_speed = sqrt(vx*vx + vy*vy);
+				double check_car_s = sensor_fusion[i][5];
 
-					if((check_car_s > car_s) && ((check_car_s-car_s) < 30))
+				check_car_s += ((double)prev_size*.02*check_speed);
+
+				// check the car on the same lane
+
+				if((check_car_s > car_s) && ((check_car_s-car_s) < 30)){
+					if(d < (2+4*lane+2) && d > (2+4*lane-2))
 					{
 						//ref_val = 29.5; //mph
-						too_close = true;
+						too_close_same_lane = true;
+					}
+					// check the cars on the left lane
+					if ((lane > 0) && (d < (2+4*(lane-1)+2) && d > (2+4*(lane-1)-2)))
+					{
+						too_close_left_lane = true;
+					}
+					// check the cars on the right lane
+					if ((lane < 2) && (d < (2+4*(lane+1)+2) && d > (2+4*(lane+1)-2)))
+					{
+						too_close_right_lane = true;
 					}
 				}
 
 			}
 
-			if(too_close)
+			if(too_close_same_lane)
 			{
-				//ref_val -= .224;
-				if(lane > 0)
+				if(lane > 0 && !too_close_left_lane)
 				{
 					lane -= 1; // move left if the front car is too close
 				}
-				else
+				else if (lane < 2 && !too_close_right_lane)
 				{
 					lane += 1;
+				}
+				else {
+					ref_val -= .224;
 				}
 			}
 			else if(ref_val < 49.5)
