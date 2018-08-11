@@ -1,140 +1,289 @@
-# CarND-Path-Planning-Project
+ ### Path Generation Project
 Self-Driving Car Engineer Nanodegree Program
-   
-### Simulator.
-You can download the Term3 Simulator which contains the Path Planning Project from the [releases tab (https://github.com/udacity/self-driving-car-sim/releases/tag/T3_v1.2).
 
-### Goals
-In this project your goal is to safely navigate around a virtual highway with other traffic that is driving +-10 MPH of the 50 MPH speed limit. You will be provided the car's localization and sensor fusion data, there is also a sparse map list of waypoints around the highway. The car should try to go as close as possible to the 50 MPH speed limit, which means passing slower traffic when possible, note that other cars will try to change lanes too. The car should avoid hitting other cars at all cost as well as driving inside of the marked road lanes at all times, unless going from one lane to another. The car should be able to make one complete loop around the 6946m highway. Since the car is trying to go 50 MPH, it should take a little over 5 minutes to complete 1 loop. Also the car should not experience total acceleration over 10 m/s^2 and jerk that is greater than 10 m/s^3.
+#### Goals
+In this project, your goal is to safely navigate around a virtual highway with other traffic that is driving +-10 MPH of the 50 MPH speed limit. You will be provided the car's localization and sensor fusion data, there is also a sparse map list of waypoints around the highway. The car should try to go as close as possible to the 50 MPH speed limit, which means passing slower traffic when possible, note that other cars will try to change lanes too. The car should avoid hitting other cars at all cost as well as driving inside of the marked road lanes at all times, unless going from one lane to another. The car should be able to make one complete loop around the 6946m highway. Since the car is trying to go 50 MPH, it should take a little over 5 minutes to complete 1 loop. Also, the car should not experience total acceleration over 10 m/s^2 and jerk that is greater than 10 m/s^3.
 
-#### The map of the highway is in data/highway_map.txt
-Each waypoint in the list contains  [x,y,s,dx,dy] values. x and y are the waypoint's map coordinate position, the s value is the distance along the road to get to that waypoint in meters, the dx and dy values define the unit normal vector pointing outward of the highway loop.
+#### Analysis
+To meet the project goal, the car should: 
+1. drive as fast as permitted;
+2. change lane if necessary but avoid accidents of any kind;
+3. keep jerks as low as possible.
 
-The highway's waypoints loop around so the frenet s value, distance along the road, goes from 0 to 6945.554.
+#### My solution
+I followed the method introduced in the project walkthrough closely. 
+ 
+First, I used the starting code from the project to make the car move along a straight line which took with the previous yaw as the direction.
+  
+ ```python
 
-## Basic Build Instructions
+double dist_inc = 0.5;
+for(int i = 0; i < 50; i++)
+{
+      next_x_vals.push_back(car_x+(dist_inc*i)*cos(deg2rad(car_yaw)));
+      next_y_vals.push_back(car_y+(dist_inc*i)*sin(deg2rad(car_yaw)));
+}
+    
+```
+  
+The car would run off the lane quickly because the lanes are not straight. So I used the frenet coordinates to make the car run on the same lane.
+`next_d` makes sure the car stay in the middle of the current lane, and `next_s` let the car move forward. Then I transformed Frenet s,d coordinates to Cartesian x,y
+because the controller of the car consumes Cartesian coordinates.
 
-1. Clone this repo.
-2. Make a build directory: `mkdir build && cd build`
-3. Compile: `cmake .. && make`
-4. Run it: `./path_planning`.
+```python
 
-Here is the data provided from the Simulator to the C++ Program
+double dist_inc = 0.5;
+for(int i = 0; i < 50; i++)
+{
+    double next_s = car_s+(i+1)*dist_inc;
+    double next_d = lane*4+2;
+    vector<double> xy = getXY(next_s, next_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+    next_x_vals.push_back(xy[0]);
+    next_y_vals.push_back(xy[1]);
+}
+            
+```
 
-#### Main car's localization Data (No Noise)
+The car was able to advance without running off the lane, but the jerks were way too high because there was no buffer between the planned paths.
+The car reached the max speed suddenly and reduced to 0 mph suddenly and again drove at the max speed, and so on so forth.
 
-["x"] The car's x position in map coordinates
+![](./assets/max_jerks.png)
 
-["y"] The car's y position in map coordinates
+The planner created some buffers so the car could slow down and speed up smoothly. There were two parts to the solution:
 
-["s"] The car's s position in frenet coordinates
+Part 1: planner took some points from the previous path as the starting points for planning next path
 
-["d"] The car's d position in frenet coordinates
+```python
 
-["yaw"] The car's yaw angle in the map
+vector<double> ptsx;
+vector<double> ptsy;
 
-["speed"] The car's speed in MPH
+double ref_x = car_x;
+double ref_y = car_y;
+double ref_yaw = deg2rad(car_yaw);
 
-#### Previous path data given to the Planner
+if (prev_size < 2) {
+    double prev_car_x = car_x - cos(car_yaw);
+    double prev_car_y = car_y - sin(car_yaw);
 
-//Note: Return the previous list but with processed points removed, can be a nice tool to show how far along
-the path has processed since last time. 
+    ptsx.push_back(prev_car_x);
+    ptsx.push_back(car_x);
 
-["previous_path_x"] The previous list of x points previously given to the simulator
+    ptsy.push_back(prev_car_y);
+    ptsy.push_back(car_y);
+} else {
+    ref_x = previous_path_x[prev_size - 1];
+    ref_y = previous_path_y[prev_size - 1];
 
-["previous_path_y"] The previous list of y points previously given to the simulator
+    double ref_x_prev = previous_path_x[prev_size - 2];
+    double ref_y_prev = previous_path_y[prev_size - 2];
 
-#### Previous path's end s and d values 
+    ptsx.push_back(ref_x_prev);
+    ptsx.push_back(ref_x);
 
-["end_path_s"] The previous list's last point's frenet s value
-
-["end_path_d"] The previous list's last point's frenet d value
-
-#### Sensor Fusion Data, a list of all other car's attributes on the same side of the road. (No Noise)
-
-["sensor_fusion"] A 2d vector of cars and then that car's [car's unique ID, car's x position in map coordinates, car's y position in map coordinates, car's x velocity in m/s, car's y velocity in m/s, car's s position in frenet coordinates, car's d position in frenet coordinates. 
-
-## Details
-
-1. The car uses a perfect controller and will visit every (x,y) point it recieves in the list every .02 seconds. The units for the (x,y) points are in meters and the spacing of the points determines the speed of the car. The vector going from a point to the next point in the list dictates the angle of the car. Acceleration both in the tangential and normal directions is measured along with the jerk, the rate of change of total Acceleration. The (x,y) point paths that the planner recieves should not have a total acceleration that goes over 10 m/s^2, also the jerk should not go over 50 m/s^3. (NOTE: As this is BETA, these requirements might change. Also currently jerk is over a .02 second interval, it would probably be better to average total acceleration over 1 second and measure jerk from that.
-
-2. There will be some latency between the simulator running and the path planner returning a path, with optimized code usually its not very long maybe just 1-3 time steps. During this delay the simulator will continue using points that it was last given, because of this its a good idea to store the last points you have used so you can have a smooth transition. previous_path_x, and previous_path_y can be helpful for this transition since they show the last points given to the simulator controller with the processed points already removed. You would either return a path that extends this previous path or make sure to create a new path that has a smooth transition with this last path.
-
-## Tips
-
-A really helpful resource for doing this project and creating smooth trajectories was using http://kluge.in-chemnitz.de/opensource/spline/, the spline function is in a single hearder file is really easy to use.
-
----
-
-## Dependencies
-
-* cmake >= 3.5
-  * All OSes: [click here for installation instructions](https://cmake.org/install/)
-* make >= 4.1
-  * Linux: make is installed by default on most Linux distros
-  * Mac: [install Xcode command line tools to get make](https://developer.apple.com/xcode/features/)
-  * Windows: [Click here for installation instructions](http://gnuwin32.sourceforge.net/packages/make.htm)
-* gcc/g++ >= 5.4
-  * Linux: gcc / g++ is installed by default on most Linux distros
-  * Mac: same deal as make - [install Xcode command line tools]((https://developer.apple.com/xcode/features/)
-  * Windows: recommend using [MinGW](http://www.mingw.org/)
-* [uWebSockets](https://github.com/uWebSockets/uWebSockets)
-  * Run either `install-mac.sh` or `install-ubuntu.sh`.
-  * If you install from source, checkout to commit `e94b6e1`, i.e.
-    ```
-    git clone https://github.com/uWebSockets/uWebSockets 
-    cd uWebSockets
-    git checkout e94b6e1
-    ```
-
-## Editor Settings
-
-We've purposefully kept editor configuration files out of this repo in order to
-keep it as simple and environment agnostic as possible. However, we recommend
-using the following settings:
-
-* indent using spaces
-* set tab width to 2 spaces (keeps the matrices in source code aligned)
-
-## Code Style
-
-Please (do your best to) stick to [Google's C++ style guide](https://google.github.io/styleguide/cppguide.html).
-
-## Project Instructions and Rubric
-
-Note: regardless of the changes you make, your project must be buildable using
-cmake and make!
+    ptsy.push_back(ref_y_prev);
+    ptsy.push_back(ref_y);
+}
 
 
-## Call for IDE Profiles Pull Requests
+vector<double> next_wp0 = getXY(car_s + 30, (2 + 4 * lane), map_waypoints_s, map_waypoints_x,
+                                map_waypoints_y);
+vector<double> next_wp1 = getXY(car_s + 60, (2 + 4 * lane), map_waypoints_s, map_waypoints_x,
+                                map_waypoints_y);
+vector<double> next_wp2 = getXY(car_s + 90, (2 + 4 * lane), map_waypoints_s, map_waypoints_x,
+                                map_waypoints_y);
 
-Help your fellow students!
+ptsx.push_back(next_wp0[0]);
+ptsx.push_back(next_wp1[0]);
+ptsx.push_back(next_wp2[0]);
 
-We decided to create Makefiles with cmake to keep this project as platform
-agnostic as possible. Similarly, we omitted IDE profiles in order to ensure
-that students don't feel pressured to use one IDE or another.
+ptsy.push_back(next_wp0[1]);
+ptsy.push_back(next_wp1[1]);
+ptsy.push_back(next_wp2[1]);
 
-However! I'd love to help people get up and running with their IDEs of choice.
-If you've created a profile for an IDE that you think other students would
-appreciate, we'd love to have you add the requisite profile files and
-instructions to ide_profiles/. For example if you wanted to add a VS Code
-profile, you'd add:
+for (int i = 0; i < ptsx.size(); i++)
+{
+    double shift_x = ptsx[i] - ref_x;
+    double shift_y = ptsy[i] - ref_y;
 
-* /ide_profiles/vscode/.vscode
-* /ide_profiles/vscode/README.md
+    ptsx[i] = (shift_x*cos(0-ref_yaw)-shift_y*sin(0-ref_yaw));
+    ptsy[i] = (shift_x*sin(0-ref_yaw)+shift_y*cos(0-ref_yaw));
+}
+```
+Step 2:  with those points and the target location , planner used spline fitting to generate new points
 
-The README should explain what the profile does, how to take advantage of it,
-and how to install it.
+```python
+tk::spline s;
+s.set_points(ptsx, ptsy);
+vector<double> next_x_vals;
+vector<double> next_y_vals;
 
-Frankly, I've never been involved in a project with multiple IDE profiles
-before. I believe the best way to handle this would be to keep them out of the
-repo root to avoid clutter. My expectation is that most profiles will include
-instructions to copy files to a new location to get picked up by the IDE, but
-that's just a guess.
+for(int i = 0; i < previous_path_x.size(); i++)
+{
+    next_x_vals.push_back(previous_path_x[i]);
+    next_y_vals.push_back(previous_path_y[i]);
+}
 
-One last note here: regardless of the IDE used, every submitted project must
-still be compilable with cmake and make./
+double target_x = 30.0;
+double target_y = s(target_x);
+double target_dist = sqrt((target_x)*(target_x)+(target_y)*(target_y));
 
-## How to write a README
-A well written README file can enhance your project and portfolio.  Develop your abilities to create professional README files by completing [this free course](https://www.udacity.com/course/writing-readmes--ud777).
+double x_add_on = 0;
+for(int i = 1; i <= 50-previous_path_x.size(); i++)
+{
+    double N = (target_dist/(0.02*ref_val/2.24));
+    double x_point = x_add_on+(target_x)/N;
+    double y_point = s(x_point);
 
+    x_add_on = x_point;
+
+    double x_ref = x_point;
+    double y_ref = y_point;
+
+    x_point = (x_ref*cos(ref_yaw)-y_ref*sin(ref_yaw));
+    y_point = (x_ref*sin(ref_yaw)+y_ref*cos(ref_yaw));
+
+    x_point += ref_x;
+    y_point += ref_y;
+
+    next_x_vals.push_back(x_point);
+    next_y_vals.push_back(y_point);
+}
+
+```
+
+The car could move smoothly only if there were no car in front of it. To avoid a collision with the front car,
+we should tell the car to reduce speed or change lanes if feasible. To keep things simple, first I only tried reducing the speed.
+The problem here is detecting the cars in front of the ego car. Such information could be derived from the sensor fusion data.
+
+For each car around the ego car, sensor provides:
+ - car's unique ID
+ - car's x position in map coordinates
+ - car's y position in map coordinates
+ - car's x velocity in m/s 
+ - car's y velocity in m/s 
+ - car's s position in frenet coordinates 
+ - car's d position in frenet coordinates
+ 
+ The distance between the front car and the ego car is given by `check_car_s-car_s.` If it's less than 30, it's unsafe, and the ego car needs to reduce speed.
+ However, we cannot brutely reduce it to 29.5 mph cause the jerk would be too high, which is unacceptable. Therefore, in an unsafe situation, I reduced the speed gradually.
+ Also, we need a strategy to speed up(within the speed limit) when it's safe to do so. When the car got back to safe mode, I increased the speed gradually.
+```python
+auto sensor_fusion = j[1]["sensor_fusion"];
+
+int prev_size = previous_path_x.size();
+
+
+if (prev_size > 0)
+{
+    car_s = end_path_s;
+}
+bool too_close = false;
+
+for(int i = 0; i < sensor_fusion.size(); i++)
+{
+    float d = sensor_fusion[i][6];
+    if(d < (2+4*lane+2) && d > (2+4*lane-2))
+    {
+        double vx = sensor_fusion[i][3];
+        double vy = sensor_fusion[i][4];
+        double check_speed = sqrt(vx*vx + vy*vy);
+        double check_car_s = sensor_fusion[i][5];
+
+        check_car_s += ((double)prev_size*.02*check_speed);
+
+        if((check_car_s > car_s) && ((check_car_s-car_s) < 30))
+        {
+            //ref_val = 29.5; //mph
+            too_close = true;
+        }
+    }
+
+}
+
+if(too_close)
+{
+    ref_val -= .224;
+}
+else if(ref_val < 49.5)
+{
+    ref_val += .224;
+}
+
+``` 
+
+The car could safely drive on the same lane forever, but the average speed might be too low, and we want to be able to shift lanes if it's safe.
+Similarly, I used the sensor fusion data to detect the cars on the left and right lanes. The strategy is:
+
+- drive as fast as possible within the speed limit
+- when approaching a car in front of it
+    - move to left if there is a left lane and the lane is clear, or 
+    - move to the right if there is a right lane and it's clear, or
+    - slow down to avoid a collision and find a chance to move left/right or speed up.
+  
+
+I utilized the same logic to detect the distances between the ego car and the cars around it. If the car got into an unsafe situation,
+ that's `too_close_same_lane` = true, I checked `too_close_left_lane` and `too_close_right_lane` to find a same lane. If none found, the ego car reduced speed.
+
+```python
+bool too_close_same_lane = false;
+bool too_close_left_lane = false;
+bool too_close_right_lane = false;
+
+for(int i = 0; i < sensor_fusion.size(); i++)
+{
+
+    float d = sensor_fusion[i][6];
+    //cout << d << " " << lane << " " << too_close_same_lane << endl;
+
+    double vx = sensor_fusion[i][3];
+    double vy = sensor_fusion[i][4];
+    double check_speed = sqrt(vx*vx + vy*vy);
+    double check_car_s = sensor_fusion[i][5];
+
+    check_car_s += ((double)prev_size*.02*check_speed);
+
+    // check the car on the same lane
+
+    if((check_car_s > car_s) && ((check_car_s-car_s) < 30)){
+        if(d < (2+4*lane+2) && d > (2+4*lane-2))
+        {
+            too_close_same_lane = true;
+        }
+        // check the cars on the left lane
+        if ((lane > 0) && (d < (2+4*(lane-1)+2) && d > (2+4*(lane-1)-2)))
+        {
+            too_close_left_lane = true;
+        }
+        // check the cars on the right lane
+        if ((lane < 2) && (d < (2+4*(lane+1)+2) && d > (2+4*(lane+1)-2)))
+        {
+            too_close_right_lane = true;
+        }
+    }
+
+}
+
+if(too_close_same_lane)
+{
+    if(lane > 0 && !too_close_left_lane)
+    {
+        lane -= 1; // move left if the front car is too close
+    }
+    else if (lane < 2 && !too_close_right_lane)
+    {
+        lane += 1;
+    }
+    else {
+        ref_val -= .224;
+    }
+}
+else if(ref_val < 49.5)
+{
+    ref_val += .224;
+}
+
+```
+Finally, the car was able to run one lap around the track without any accidents in 5+ minutes.
+
+![](./assets/one_lap.png)
