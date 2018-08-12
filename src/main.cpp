@@ -253,7 +253,8 @@ int main() {
 			{
 				car_s = end_path_s;
 			}
-			bool too_close_same_lane = false;
+			bool too_close_same_lane_front = false;
+			bool too_close_same_lane_back = false;
 			bool too_close_left_lane = false;
 			bool too_close_right_lane = false;
 
@@ -270,10 +271,13 @@ int main() {
 				check_car_s += ((double)prev_size*.02*check_speed);
 
 				// check cars on the same lane
-				if((check_car_s > car_s) && ((check_car_s-car_s) < 20)){
+				if(((check_car_s > car_s) && ((check_car_s-car_s) < 30)) || ((check_car_s < car_s) && ((car_s - check_car_s) < 20))) {
 					if(d < (2+4*lane+2) && d > (2+4*lane-2))
 					{
-						too_close_same_lane = true;
+						if(check_car_s > car_s)
+							too_close_same_lane_front = true;
+						else
+							too_close_same_lane_back = true;
 					}
 					// check cars on the left lane
 					if ((lane > 0) && (d < (2+4*(lane-1)+2) && d > (2+4*(lane-1)-2)))
@@ -287,9 +291,10 @@ int main() {
 					}
 				}
 
+
 			}
 
-			if(too_close_same_lane)
+			if(too_close_same_lane_front)
 			{
 				if(lane > 0 && !too_close_left_lane)
 				{
@@ -300,12 +305,19 @@ int main() {
 					lane += 1;
 				}
 				else {
-					ref_val -= .01;
+
+					if(!too_close_same_lane_back)
+					{
+						ref_val -= 0.1;
+					}
+					else {
+						ref_val -= 0.01;
+					}
 				}
 			}
 			else if(ref_val < 49.5)
 			{
-				ref_val += .224;
+				ref_val += .1;
 			}
 
 
