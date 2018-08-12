@@ -271,7 +271,7 @@ int main() {
 				check_car_s += ((double)prev_size*.02*check_speed);
 
 				// check cars on the same lane
-				if(((check_car_s > car_s) && ((check_car_s-car_s) < 30)) || ((check_car_s < car_s) && ((car_s - check_car_s) < 20))) {
+				if(((check_car_s > car_s) && ((check_car_s-car_s) < 25)) || ((check_car_s < car_s) && ((car_s - check_car_s) < 15))) {
 					if(d < (2+4*lane+2) && d > (2+4*lane-2))
 					{
 						if(check_car_s > car_s)
