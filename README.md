@@ -219,14 +219,17 @@ Similarly, I used the sensor fusion data to detect the cars on the left and righ
 - when approaching a car in front of it
     - move to left if there is a left lane and the lane is clear, or 
     - move to the right if there is a right lane and it's clear, or
-    - slow down to avoid a collision and find a chance to move left/right or speed up.
+    - slow down to avoid a collision and find a chance to move left/right or speed up
+        - if there is a car behind the ego car, slow down at a moderate rate
+        - otherwise, slow down at a higher rate
   
 
 I utilized the same logic to detect the distances between the ego car and the cars around it. If the car got into an unsafe situation,
  that's `too_close_same_lane` = true, I checked `too_close_left_lane` and `too_close_right_lane` to find a same lane. If none found, the ego car reduced speed.
 
 ```python
-bool too_close_same_lane = false;
+bool too_close_same_lane_front = false;
+bool too_close_same_lane_back = false;
 bool too_close_left_lane = false;
 bool too_close_right_lane = false;
 
@@ -234,7 +237,6 @@ for(int i = 0; i < sensor_fusion.size(); i++)
 {
 
     float d = sensor_fusion[i][6];
-    //cout << d << " " << lane << " " << too_close_same_lane << endl;
 
     double vx = sensor_fusion[i][3];
     double vy = sensor_fusion[i][4];
@@ -243,28 +245,31 @@ for(int i = 0; i < sensor_fusion.size(); i++)
 
     check_car_s += ((double)prev_size*.02*check_speed);
 
-    // check the car on the same lane
-
-    if((check_car_s > car_s) && ((check_car_s-car_s) < 30)){
+    // check cars on the same lane
+    if(((check_car_s > car_s) && ((check_car_s-car_s) < 25)) || ((check_car_s < car_s) && ((car_s - check_car_s) < 15))) {
         if(d < (2+4*lane+2) && d > (2+4*lane-2))
         {
-            too_close_same_lane = true;
+            if(check_car_s > car_s)
+                too_close_same_lane_front = true;
+            else
+                too_close_same_lane_back = true;
         }
-        // check the cars on the left lane
+        // check cars on the left lane
         if ((lane > 0) && (d < (2+4*(lane-1)+2) && d > (2+4*(lane-1)-2)))
         {
             too_close_left_lane = true;
         }
-        // check the cars on the right lane
+        // check cars on the right lane
         if ((lane < 2) && (d < (2+4*(lane+1)+2) && d > (2+4*(lane+1)-2)))
         {
             too_close_right_lane = true;
         }
     }
 
+
 }
 
-if(too_close_same_lane)
+if(too_close_same_lane_front)
 {
     if(lane > 0 && !too_close_left_lane)
     {
@@ -275,12 +280,19 @@ if(too_close_same_lane)
         lane += 1;
     }
     else {
-        ref_val -= .224;
+
+        if(!too_close_same_lane_back)
+        {
+            ref_val -= 0.1;
+        }
+        else {
+            ref_val -= 0.01;
+        }
     }
 }
 else if(ref_val < 49.5)
 {
-    ref_val += .224;
+    ref_val += .1;
 }
 
 ```
